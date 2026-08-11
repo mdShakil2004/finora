@@ -1,298 +1,398 @@
-# 🏦 Finora — Consumer Finance Analytics & Rewards Platform
+# Finora — Financial Dashboard & Rewards Engine
 
-[![Stack](https://img.shields.io/badge/Stack-React_18_%7C_FastAPI_%7C_TypeScript_%7C_Tailwind-blue.svg)](https://github.com)
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-18.3-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![SQLite](https://img.shields.io/badge/Database-SQLite%2FAsync_SQLAlchemy-003B57.svg?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+## Overview
 
-Finora is an end-to-end, full-stack consumer finance dashboard and dynamic loyalty rewards platform. It ingests, cleans, normalizes, and analyzes over **8,400+ transaction records**, automatically computes rule-based reward coin earnings, visualizes monthly and categorical spending trends, and offers a gamified voucher store with instant redemption capabilities.
+**Finora** is a full-stack consumer finance application and loyalty rewards platform built for tracking financial transactions, analyzing spending trends, and redeeming earned reward coins. 
 
----
+The application ingests raw transaction datasets, normalizes transaction metadata, calculates rule-based reward coins for eligible payments, presents spending insights through interactive charts, and manages an atomic voucher redemption store.
 
-## 📑 Table of Contents
-
-- [Overview \& Key Capabilities](#-overview--key-capabilities)
-- [Architecture \& System Design](#-architecture--system-design)
-- [What Has Been Implemented So Far](#-what-has-been-implemented-so-far)
-  - [Backend Engineering (Python / FastAPI)](#1-backend-engineering-python--fastapi)
-  - [Frontend Engineering (React / TypeScript / Vite)](#2-frontend-engineering-react--typescript--vite)
-  - [Data Pipeline \& Seed Engine](#3-data-pipeline--seed-engine)
-- [Directory Structure](#-directory-structure)
-- [Complete Local Setup Guide](#-complete-local-setup-guide)
-  - [Prerequisites](#prerequisites)
-  - [Step 1: Clone Repository \& Dataset Check](#step-1-clone-repository--dataset-check)
-  - [Step 2: Python Virtual Environment Setup](#step-2-python-virtual-environment-setup)
-  - [Step 3: Database Ingestion \& Seeding](#step-3-database-ingestion--seeding)
-  - [Step 4: Frontend Dependencies \& Running Dev Server](#step-4-frontend-dependencies--running-dev-server)
-- [API Endpoints Reference](#-api-endpoints-reference)
-- [GitHub Deployment \& Commit Instructions](#-github-deployment--commit-instructions)
-- [Troubleshooting](#-troubleshooting)
+### Main User Workflow
+1. **Financial Overview / Dashboard**: View high-level metrics (Total Spending, Successful Transaction Count, Success Rate %, and Current Reward Coin Balance), analyze category breakdown and monthly trend charts, and inspect recent transactions.
+2. **Transactions Ledger**: Search transactions by merchant name or ID, apply filters (Category, Status, Amount Range, Date Range), sort by date or amount, and view full transaction metadata in a slide-over detail drawer.
+3. **Rewards Catalogue**: View active reward vouchers (e.g., Amazon, Swiggy, Flipkart, Cashback), check required coin balances, and perform atomic voucher redemptions with real-time balance updates and voucher code generation.
 
 ---
 
-## 🌟 Overview & Key Capabilities
+## Features
 
-- **💳 High-Volume Transaction Explorer**: Fast, paginated (10, 25, 50, 100 rows/page) transaction grid with debounced multi-field search, status filters (`SUCCESS`, `FAILED`, `PENDING`, `REFUNDED`), category/payment method dropdowns, custom date-range pickers, and slide-over metadata drawers.
-- **🪙 Dynamic Rewards Engine**: Server-side rule calculation awarding **1 Finora Coin for every ₹10 spent** on successful transactions (capped at **500 coins max per transaction**).
-- **🎁 Real-time Voucher Store**: Marketplace featuring top-brand rewards (Amazon, Flipkart, Swiggy, Zomato, BookMyShow, Uber, Starbucks). Includes balance checking, atomic coin deductions, and unique voucher code generation.
-- **📊 Interactive Financial Analytics**: Recharts-powered interactive analytics featuring monthly expenditure trendlines and categorical spending distribution donuts.
-- **⚡ Single-Command Full-Stack Execution**: Node.js Express proxy layer (`server.ts`) running on **Port 3000** that automatically spawns and manages the Python FastAPI backend process on **Port 8001**, seamlessly proxying `/api/*` traffic.
+### Transactions
+- **Transaction Table**: Responsive paginated table displaying transaction ID, date, merchant, category, amount (formatted in INR `₹`), status badge, payment method, and earned reward coins.
+- **Pagination**: Server-side pagination supporting configurable page sizes (10, 25, 50, 100 items per page) with jump-to-page navigation.
+- **Merchant Search**: Debounced search matching merchant names and transaction IDs.
+- **Category Filtering**: Dropdown filtering by expense categories (e.g., Shopping, Food & Dining, Utilities, Travel, Entertainment).
+- **Payment Status Filtering**: Filter by transaction state (`SUCCESS`, `FAILED`, `PENDING`).
+- **Date Range Filtering**: Filter transactions between custom start and end dates (`YYYY-MM-DD`).
+- **Amount Range Filtering**: Filter by minimum (`min_amount`) and maximum (`max_amount`) monetary thresholds.
+- **Sorting**: Toggle sorting by Date (`timestamp`) or Amount (`amount`) in ascending or descending order.
+- **Transaction Detail Drawer**: Slide-over drawer modal rendering detailed transaction metadata, payment method details, and explicit reward coin derivation rules.
+
+### Analytics
+- **Spending by Category**: Donut chart displaying spending volume and transaction count distribution across categories.
+- **Monthly Spending Trend**: Bar / Area chart displaying aggregated monthly expenditure over time.
+- **Chart-to-Table Filtering**: Clicking a category slice on the donut chart automatically filters the transaction table by that category and switches to the transactions view.
+
+### Rewards
+- **Visible Coin Balance**: Real-time coin balance badge displayed prominently in the global navigation bar and summary cards.
+- **Rewards Catalogue**: Grid of active reward vouchers displaying title, description, required coin cost, and reward type.
+- **Redemption Confirmation**: Modal dialog confirming voucher redemption and displaying generated voucher codes upon completion.
+- **Backend Validation**: Server-side checks enforcing user balance sufficiency, reward active state, and atomic row locking.
+- **Balance Update**: Instant client-side state update following successful API redemption responses.
+- **Error Handling**: Friendly toast notifications for insufficient balance (409 Conflict) or server errors.
 
 ---
 
-## 📐 Architecture & System Design
+## Architecture
+
+The target system architecture for this assessment is:
 
 ```text
-  +-------------------------------------------------------------------------+
-  |                               Browser                                   |
-  |             React 18 SPA + Tailwind CSS + Recharts + Lucide             |
-  +------------------------------------|------------------------------------+
-                                       | HTTP Requests (Port 3000)
-                                       v
-  +-------------------------------------------------------------------------+
-  |                    Node.js + Express Proxy Layer                        |
-  |    - Serves Vite Frontend Static Assets / HMR                           |
-  |    - Proxies /api/* requests to FastAPI (Port 8001)                     |
-  |    - Auto-spawns Python FastAPI process on boot                         |
-  +------------------------------------|------------------------------------+
-                                       | Internal Reverse Proxy
-                                       v
-  +-------------------------------------------------------------------------+
-  |                        FastAPI Python Backend                           |
-  |    - Async SQLAlchemy 2.0 ORM + Pydantic V2 Data Validation            |
-  |    - Endpoints: /api/transactions, /api/rewards, /api/analytics       |
-  +------------------------------------|------------------------------------+
-                                       | Async I/O (aiosqlite / asyncpg)
-                                       v
-  +-------------------------------------------------------------------------+
-  |                     Database Layer (finora.db)                          |
-  |    - Tables: transactions (8,461 rows), users, rewards, redemptions    |
-  +-------------------------------------------------------------------------+
+transactions.json
+      ↓
+   seed.py
+      ↓
+  PostgreSQL
+      ↓
+   FastAPI
+      ↓
+  Frontend
 ```
 
----
-
-## 🛠️ What Has Been Implemented So Far
-
-### 1. Backend Engineering (Python / FastAPI)
-- **Framework & Runtime**: Built with Python 3.10+, FastAPI, and `uvicorn`.
-- **Async Database Stack**: Utilizes SQLAlchemy 2.0 (`AsyncSession`) and `aiosqlite` for zero-friction local execution, ready for PostgreSQL via `asyncpg`.
-- **Database Models (`backend/app/models/`)**:
-  - `Transaction`: Normalizes transaction ID, timestamp, merchant, category, amount, currency, status, payment method, and calculated reward coins.
-  - `User`: Tracks user profile data and live reward coin balances (`coin_balance`).
-  - `Reward`: Holds available gift vouchers, coin costs, category tags, and icon metadata.
-  - `RedemptionLog`: Maintains an audit trail of redeemed vouchers, timestamps, coins spent, and generated codes.
-- **Repository & Service Pattern (`backend/app/repositories/` & `services/`)**:
-  - Clean separation of concerns decoupling data access logic from route controllers.
-  - Efficient SQL queries using dynamic filters, case-insensitive string matching, date truncations, and dialect-aware SQL date functions (`strftime` for SQLite, `to_char` for PostgreSQL).
-- **Pydantic Schemas (`backend/app/schemas/`)**: Strict typing and request/response validation for pagination, filtering options, analytics summaries, and reward redemptions.
-
-### 2. Frontend Engineering (React / TypeScript / Vite)
-- **UI & Layout Hierarchy**:
-  - `Navbar.tsx`: Features tab navigation and a **Live Finora Coin Balance Widget** that updates in real time upon voucher redemptions.
-  - `SummaryCards.tsx`: Top dashboard metric cards showing Total Volume, Transaction Count, Success Rate %, and Cumulative Reward Coins.
-  - `FilterBar.tsx`: Multi-filter suite with debounced text search, category picker, status selector, payment method selector, date picker, and reset button.
-  - `TransactionTable.tsx`: Responsive table with INR currency formatting (`₹`), color-coded status badges, reward coin tags, row click detail drawers, page size selectors (10/25/50/100), and jump-to-page pagination controls.
-  - `TransactionDetailDrawer.tsx`: Slide-over modal showing full transaction detail breakdown and coin derivation math.
-  - `AnalyticsSection.tsx`: Dual chart view with monthly spending trend lines and category spending breakdown donut charts.
-  - `RewardsCatalogue.tsx`: Interactive voucher card grid with instant redemption modal and voucher code copying.
-- **Express Proxy Integration (`server.ts`)**:
-  - Solves CORS and port management by hosting everything on port 3000.
-  - Auto-spawns `python3 -m uvicorn backend.app.main:app --port 8001` in the background when `npm run dev` or `npm start` is executed.
-
-### 3. Data Pipeline & Seed Engine
-- **Dataset Processor (`backend/scripts/seed.py`)**:
-  - Parses `transactions.json` (8,461 raw entries) located in the root directory.
-  - **Data Sanitization**: Standardizes status variants (e.g. `"Success"` -> `"SUCCESS"`), imputes missing merchants (`"Unknown Merchant"`) and categories (`"Uncategorized"`).
-  - **Rewards Calculator**:
-    $$\text{reward\_coins} = \begin{cases} \min\left(500, \left\lfloor \frac{\text{amount}}{10} \right\rfloor\right) & \text{if status} = \text{"SUCCESS"} \\ 0 & \text{otherwise} \end{cases}$$
-  - Automatically totals earned coins across all records and seeds the initial balance of **617,858 coins** for `demo-user`.
-  - Populates 8 voucher rewards in the catalogue.
+### Actual Current Database Implementation
+- **Current Default State**: The repository's default configuration (`backend/app/core/config.py`) uses **SQLite** (`sqlite+aiosqlite:///./finora.db`) for zero-dependency local setup.
+- **PostgreSQL Support**: The codebase uses **SQLAlchemy 2.0 Async** with `asyncpg` (`backend/requirements.txt`), allowing seamless switching to PostgreSQL by setting the `DATABASE_URL` environment variable (e.g., `DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/finora`).
 
 ---
 
-## 📁 Directory Structure
+## Tech Stack
+
+### Frontend
+- **Framework**: React 19 (via Vite 6.2)
+- **Language**: TypeScript 5.8
+- **Styling**: Tailwind CSS 4.1
+- **Charts**: Recharts 3.10
+- **Icons**: Lucide React
+- **Animations**: Motion
+
+### Backend
+- **Framework**: Python 3.10+ / FastAPI 0.100+
+- **ORM**: SQLAlchemy 2.0 (Async)
+- **Data Validation**: Pydantic V2 (`pydantic-settings`)
+- **Server**: Uvicorn / Node.js Express Proxy (`server.ts`)
+
+### Database
+- **SQLite**: Local file database (`finora.db` via `aiosqlite`) used by default.
+- **PostgreSQL**: Supported via `asyncpg` driver when `DATABASE_URL` is set to a PostgreSQL connection string.
+
+---
+
+## Project Structure
 
 ```text
-finora/
-├── README.md                 # Master Documentation (This File)
-├── backendMD.md              # Dedicated Backend Architecture Guide
-├── frontend.md               # Dedicated Frontend Architecture Guide
-├── transactions.json         # Raw Transaction Dataset (8,461 records)
-├── finora.db                 # SQLite Database File (Generated by seed script)
-├── package.json              # Frontend dependencies & Node proxy scripts
-├── server.ts                 # Express Proxy Server & FastAPI Process Manager
-├── vite.config.ts            # Vite Configuration
-├── tsconfig.json             # TypeScript Configuration
+/
+├── README.md                   # Master engineering documentation
+├── ASSUMPTIONS.md              # Product and technical assumptions
+├── DECISIONS.md                # Architecture and design decision records
+├── AI-USAGE.md                 # Record of AI usage, corrections, and verifications
+├── transactions.json           # Raw transaction dataset (8,461 records)
+├── finora.db                   # SQLite database (generated by seed.py)
+├── package.json                # Node.js dependencies and script runners
+├── server.ts                   # Express proxy server running Vite & spawning FastAPI
+├── vite.config.ts              # Vite configuration
 │
-├── src/                      # React Frontend Source Code
-│   ├── components/           # Modular UI Components
+├── src/                        # Frontend React Application
+│   ├── components/             # React UI components
 │   │   ├── AnalyticsSection.tsx      # Spending charts (Recharts)
-│   │   ├── FilterBar.tsx             # Multi-faceted filter panel
-│   │   ├── Navbar.tsx                # Header & live coin counter badge
-│   │   ├── RewardsCatalogue.tsx      # Voucher store & redemption modal
-│   │   ├── SummaryCards.tsx          # Metric cards
+│   │   ├── FilterBar.tsx             # Search and filter panel
+│   │   ├── Navbar.tsx                # Header & live coin counter
+│   │   ├── RewardsCatalogue.tsx      # Voucher catalogue & redemption modal
+│   │   ├── SummaryCards.tsx          # Key metrics dashboard
 │   │   ├── TransactionDetailDrawer.tsx # Slide-over transaction details
-│   │   ├── TransactionTable.tsx      # Paginated data table
-│   │   └── ui/                   # Primitive UI components
-│   ├── lib/                  # Utilities (INR currency & date formatters)
-│   │   └── utils.ts
-│   ├── App.tsx               # Primary layout container & global state
-│   ├── main.tsx              # React entry point
-│   └── types.ts              # Shared TypeScript definitions
+│   │   ├── TransactionTable.tsx      # Paginated transaction data table
+│   │   └── ui/                   # Reusable UI primitives (Button, Input, Select, Badge, Toast)
+│   ├── lib/                    # API client and utility formatters
+│   │   ├── api.ts                # Axios/fetch API client wrappers
+│   │   └── utils.ts              # Currency & date formatting helpers
+│   ├── App.tsx                 # Main application orchestrator
+│   ├── main.tsx                # React root entry point
+│   └── types.ts                # TypeScript interfaces and data models
 │
-└── backend/                  # Python FastAPI Backend Source Code
+└── backend/                    # Python FastAPI Backend
     ├── app/
-    │   ├── api/              # Route controllers
-    │   │   ├── analytics.py    # Monthly & category analytics
-    │   │   ├── health.py       # Health check endpoint
-    │   │   ├── rewards.py      # Coin balance & voucher redemption
-    │   │   └── transactions.py # Paginated transaction queries
-    │   ├── core/             # Configuration & DB initialization
-    │   │   ├── config.py       # App settings & env variables
-    │   │   ├── database.py     # Async SQLAlchemy engine & session maker
-    │   │   └── logging.py      # App logger setup
-    │   ├── models/           # SQLAlchemy ORM models
-    │   │   ├── redemption.py   # Redemption log model
-    │   │   ├── reward.py       # Reward voucher model
-    │   │   ├── transaction.py  # Transaction model
-    │   │   └── user.py         # User profile & coin balance model
-    │   ├── repositories/     # Database access layer
-    │   ├── schemas/          # Pydantic data models
-    │   ├── services/         # Core business logic layer
-    │   └── main.py           # FastAPI entry point
+    │   ├── api/                # API endpoint controllers
+    │   │   ├── analytics.py      # Category & monthly spending endpoints
+    │   │   ├── health.py         # System health check endpoint
+    │   │   ├── rewards.py        # Coin balance & voucher redemption endpoints
+    │   │   └── transactions.py   # Paginated transaction listing endpoints
+    │   ├── core/               # App configuration & DB session factory
+    │   │   ├── config.py         # Pydantic Settings & env configuration
+    │   │   ├── database.py       # Async SQLAlchemy engine & AsyncSession Local
+    │   │   └── logging.py        # Structured logging setup
+    │   ├── models/             # SQLAlchemy ORM models
+    │   │   ├── redemption.py     # RewardRedemption model
+    │   │   ├── reward.py         # Reward model
+    │   │   ├── transaction.py    # Transaction model
+    │   │   └── user.py           # User model
+    │   ├── repositories/       # Data access repository layer
+    │   ├── schemas/            # Pydantic request/response schemas
+    │   ├── services/           # Business logic layer
+    │   └── main.py             # FastAPI app initialization & middleware
     ├── scripts/
-    │   └── seed.py           # Dataset cleaning & database seeder
-    └── requirements.txt      # Python dependencies
+    │   └── seed.py             # Ingestion & normalization script
+    ├── tests/                  # Backend pytest suite
+    │   ├── test_health.py        # Health endpoint tests
+    │   ├── test_rewards.py       # Reward service & balance tests
+    │   └── test_transactions.py  # Transaction querying & filter tests
+    └── requirements.txt        # Python backend package dependencies
 ```
 
 ---
 
-## 🚀 Complete Local Setup Guide
+## Database
 
-### Prerequisites
-- **Node.js**: `v18.0.0` or higher
-- **Python**: `v3.10.0` or higher
-- **Git**: Installed
+### Schema Overview
+The database schema consists of four relational tables defined in `backend/app/models/`:
+
+1. **`transactions`**:
+   - `id` (`VARCHAR`, PK, Indexed): Unique transaction identifier (e.g. `TXN-101345`).
+   - `timestamp` (`TIMESTAMPTZ`, Indexed): ISO transaction date and time.
+   - `merchant` (`VARCHAR(255)`, Indexed): Merchant name.
+   - `category` (`VARCHAR(100)`, Indexed): Expense category.
+   - `amount` (`NUMERIC(14,2)`, Indexed): Monetary value in `INR`.
+   - `currency` (`VARCHAR(3)`): Currency code (defaults to `INR`).
+   - `status` (`VARCHAR(20)`, Indexed): Transaction state (`SUCCESS`, `FAILED`, `PENDING`).
+   - `payment_method` (`VARCHAR(50)`): Method used (e.g., `UPI`, `Credit Card`, `Debit Card`).
+   - `created_at` (`TIMESTAMPTZ`): Server creation timestamp.
+
+2. **`users`**:
+   - `id` (`VARCHAR`, PK): User ID (`demo-user`).
+   - `name` (`VARCHAR(255)`): User account name.
+   - `coin_balance` (`INTEGER`): Current balance of earned reward coins.
+   - `created_at` / `updated_at` (`TIMESTAMPTZ`).
+
+3. **`rewards`**:
+   - `id` (`VARCHAR`, PK): Reward identifier (e.g., `REW-AMAZON-100`).
+   - `name` (`VARCHAR(255)`): Voucher title.
+   - `description` (`VARCHAR`): Details and terms.
+   - `coin_cost` (`INTEGER`): Required coins for redemption.
+   - `reward_type` (`VARCHAR(50)`): Type tag (`voucher`, `cashback`, `travel`).
+   - `active` (`BOOLEAN`): Availability status.
+
+4. **`reward_redemptions`**:
+   - `id` (`VARCHAR`, PK): Redemption receipt ID (`RED-XXXXXXXX`).
+   - `user_id` (`VARCHAR`, FK -> `users.id`, Indexed): Redeeming user.
+   - `reward_id` (`VARCHAR`, FK -> `rewards.id`, Indexed): Redeemed reward item.
+   - `coins_spent` (`INTEGER`): Coins deducted.
+   - `redeemed_at` (`TIMESTAMPTZ`): Timestamp of redemption.
+
+### Indexes
+To optimize search, filtering, and sorting performance across thousands of records, explicit B-tree indexes are defined on `transactions`:
+- `idx_txn_timestamp` on `timestamp`
+- `idx_txn_merchant` on `merchant`
+- `idx_txn_category` on `category`
+- `idx_txn_status` on `status`
+- `idx_txn_amount` on `amount`
 
 ---
 
-### Step 1: Clone Repository & Dataset Check
-Clone your repository and ensure `transactions.json` is located in the **root project directory**:
+## Seed Data
 
-```bash
-git clone https://github.com/YOUR_USERNAME/finora.id.git
-cd finora
-```
+### Dataset & Execution
+- **File Location**: `/transactions.json`
+- **Total Records in Dataset**: **8,461**
+- **Total Records Inserted**: **8,461**
+- **Duplicates / Skipped**: **0**
 
----
+### Normalization Performed
+1. **Timestamps**: Parses Unix timestamps (milliseconds and seconds), slash dates (`YYYY/MM/DD`), date-only strings (`YYYY-MM-DD`), and ISO strings into UTC timezone-aware datetimes.
+2. **Status**: Standardizes raw status values into `SUCCESS`, `FAILED`, or `PENDING`.
+3. **Category**: Cleans empty, `"null"`, `"undefined"`, or `"N/A"` strings into `"Uncategorized"`.
+4. **Amount**: Converts raw amounts into `Decimal` rounded to 2 decimal places.
+5. **Reward Computation**: For every `SUCCESS` transaction with `amount > 0`, calculates earned coins:
+   $$\text{coins} = \min\left(500, \left\lfloor \frac{\text{amount}}{100} \right\rfloor\right)$$
+6. **User Balance Seeding**: Calculates the sum of all earned coins across the dataset (**617,858 coins**) and sets the initial balance for `demo-user`.
+7. **Idempotency**: Clears existing entries in `reward_redemptions`, `transactions`, `rewards`, and `users` before re-seeding to ensure identical re-runs.
 
-### Step 2: Python Virtual Environment Setup
-
-#### On macOS / Linux:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r backend/requirements.txt
-```
-
-#### On Windows (Command Prompt / PowerShell):
-```cmd
-python -m venv venv
-venv\Scripts\activate
-pip install -r backend/requirements.txt
-```
-
----
-
-### Step 3: Database Ingestion & Seeding
-
-Process and import the 8,461 records from `transactions.json` into SQLite (`finora.db`):
-
-#### On macOS / Linux:
+### Seed Command
 ```bash
 PYTHONPATH=. python3 backend/scripts/seed.py
 ```
 
-#### On Windows Command Prompt:
-```cmd
-set PYTHONPATH=.
-python backend/scripts/seed.py
-```
+---
 
-**Console Output Verification:**
-```text
-Loaded 8461 transactions from transactions.json
-Inserted 8461 transactions into database.
-Seeded user 'demo-user' with 617858 reward coins.
-Seeded 8 rewards into catalogue.
-Database seeding completed successfully!
+## API
+
+### Endpoints Summary
+
+#### Health
+- `GET /api/health`
+  - **Purpose**: System health check & database connectivity test.
+  - **Response**: `{"status": "ok", "database": "ok"}`
+
+#### Transactions
+- `GET /api/transactions`
+  - **Purpose**: Retrieve paginated and filtered transactions.
+  - **Query Parameters**:
+    - `page` (int, default: 1)
+    - `page_size` (int, default: 25, max: 100)
+    - `search` (string, optional): Merchant name or ID search.
+    - `category` (string, optional): Filter by category.
+    - `status` (string, optional): Filter by status (`SUCCESS`, `FAILED`, `PENDING`).
+    - `min_amount` / `max_amount` (float, optional): Filter by amount range.
+    - `start_date` / `end_date` (string, optional): ISO date range.
+    - `sort_by` (string, default: `"date"`): Field to sort by (`"date"`, `"amount"`).
+    - `sort_order` (string, default: `"desc"`): `"asc"` or `"desc"`.
+  - **Response**: `{ "items": [...], "total": 8461, "page": 1, "page_size": 25, "total_pages": 339 }`
+
+- `GET /api/transactions/{transaction_id}`
+  - **Purpose**: Get full detail for a single transaction.
+  - **Response**: Full transaction object or `404 Not Found`.
+
+#### Rewards
+- `GET /api/rewards/balance`
+  - **Purpose**: Retrieve current coin balance for the demo user.
+  - **Response**: `{"user_id": "demo-user", "coin_balance": 617858}`
+
+- `GET /api/rewards`
+  - **Purpose**: Retrieve active rewards catalogue items.
+  - **Response**: List of reward voucher objects.
+
+- `POST /api/rewards/redeem`
+  - **Purpose**: Redeem a voucher using reward coins.
+  - **Request Body**: `{"reward_id": "REW-AMAZON-100"}`
+  - **Response Behavior**:
+    - `200 OK`: `{"success": true, "redemption_id": "RED-1A2B3C4D", "coins_spent": 1000, "new_balance": 616858, ...}`
+    - `404 Not Found`: Reward or user not found.
+    - `409 Conflict`: Insufficient coin balance or inactive reward.
+
+#### Analytics
+- `GET /api/analytics/categories`
+  - **Purpose**: Retrieve aggregated total spend and transaction count grouped by category.
+  - **Response**: `[{"category": "Shopping", "amount": 123456.78, "transaction_count": 520}, ...]`
+
+- `GET /api/analytics/monthly`
+  - **Purpose**: Retrieve aggregated spending totals grouped by month (`YYYY-MM`).
+  - **Response**: `[{"month": "2025-08", "amount": 5246585.62}, ...]`
+
+---
+
+## Local Development
+
+### Prerequisites
+- **Node.js**: v18.0.0 or higher
+- **Python**: v3.10.0 or higher
+- **PostgreSQL** (optional; SQLite is used by default if omitted)
+
+### Step-by-Step Setup Guide
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd finora
+   ```
+
+2. **Install Frontend Dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Install Backend Dependencies**:
+   ```bash
+   pip install -r backend/requirements.txt
+   ```
+
+4. **Configure Environment Variables**:
+   Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+5. **(Optional) Configure PostgreSQL**:
+   To use PostgreSQL instead of default SQLite, update `.env`:
+   ```env
+   DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/finora
+   ```
+
+6. **Seed Database**:
+   ```bash
+   PYTHONPATH=. python3 backend/scripts/seed.py
+   ```
+
+7. **Start Application**:
+   ```bash
+   npm run dev
+   ```
+   *This starts the Express proxy on `http://localhost:3000` and automatically launches FastAPI on port `8001`.*
+
+---
+
+## Environment Variables
+
+Defined in `.env.example`:
+
+```env
+DATABASE_URL=sqlite+aiosqlite:///./finora.db
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000
+ENVIRONMENT=development
+MAX_REWARD_COINS_PER_TRANSACTION=500
+DEMO_USER_ID=demo-user
 ```
 
 ---
 
-### Step 4: Frontend Dependencies & Running Dev Server
+## Testing
 
-Install Node dependencies and start the application:
+- **Framework**: `pytest` + `httpx`
+- **Test Suite Location**: `backend/tests/`
+  - `test_health.py`: Verifies `/api/health` status and DB connection.
+  - `test_rewards.py`: Verifies balance endpoint, catalogue listing, nonexistent reward handling, and successful atomic redemption balance deduction.
+  - `test_transactions.py`: Verifies pagination, search, status/category filtering, sorting, and detail endpoints.
 
+### How to Run Tests
 ```bash
-npm install
-npm run dev
+PYTHONPATH=. pytest backend/tests
 ```
 
-Open your browser at **`http://localhost:3000`**.
+### Current Test Execution Status
+- **Execution Result**: **FAILING ON DEFAULT RUN**
+- **Root Cause**: The test files rely on `@pytest.mark.asyncio`, but the `pytest-asyncio` plugin is not included in `backend/requirements.txt`. Installing `pytest-asyncio` allows the test suite to execute natively.
 
 ---
 
-## 📡 API Endpoints Reference
+## Deployment
 
-| Category | Endpoint | Method | Description |
-| :--- | :--- | :--- | :--- |
-| **System** | `/api/health` | `GET` | Health check and database connection ping |
-| **Transactions** | `/api/transactions` | `GET` | Paginated listing with search, filters & sorting |
-| **Transactions** | `/api/transactions/summary` | `GET` | Aggregated spend volume, counts & earned coins |
-| **Rewards** | `/api/rewards/balance` | `GET` | Fetch live coin balance for user |
-| **Rewards** | `/api/rewards` | `GET` | Fetch available voucher catalog |
-| **Rewards** | `/api/rewards/redeem` | `POST` | Redeem voucher, deduct coins & issue code |
-| **Analytics** | `/api/analytics/monthly` | `GET` | Monthly aggregate spend data |
-| **Analytics** | `/api/analytics/categories` | `GET` | Category breakdown aggregate spend data |
+- **Deployment Status**: **NOT DEPLOYED**
+- **Environment**: Local Cloud Run container / AI Studio preview environment.
 
 ---
 
-## 🐙 GitHub Deployment & Commit Instructions
+## Documentation Links
 
-To push this repository to GitHub for the first time:
-
-```bash
-# 1. Initialize git (if not already initialized)
-git init
-
-# 2. Add all files to staging
-git add .
-
-# 3. Create initial commit
-git commit -m "feat: complete full-stack finora platform with fastAPI, react & seed engine"
-
-# 4. Set main branch & add remote repository
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/finora.git
-
-# 5. Push code to GitHub
-git push -u origin main
-```
+- 📖 [Assumptions (`ASSUMPTIONS.md`)](./ASSUMPTIONS.md)
+- 📖 [Technical Decisions (`DECISIONS.md`)](./DECISIONS.md)
+- 📖 [AI Usage & Verification (`AI-USAGE.md`)](./AI-USAGE.md)
 
 ---
 
-## ❓ Troubleshooting
+## Done / Not Done / Known Issues
 
-- **Issue: `ModuleNotFoundError: No module named 'backend'`**
-  - **Fix**: Always set `PYTHONPATH=.` when running backend scripts directly:
-    `PYTHONPATH=. python3 backend/scripts/seed.py`
-- **Issue: Coin balance displays 0**
-  - **Fix**: Re-run the seed script to generate `finora.db`:
-    `PYTHONPATH=. python3 backend/scripts/seed.py`
-- **Issue: Port 3000 or 8001 already in use**
-  - **Fix**: Stop existing Node/Python processes or kill the process occupying the port:
-    `lsof -ti:3000,8001 | xargs kill -9`
+### Done
+- [x] Ingest and normalize 8,461 transaction records from `transactions.json`.
+- [x] Calculate reward coins based on 1 coin per ₹100 spent (max 500 coins per transaction).
+- [x] Full-stack REST API with FastAPI, SQLAlchemy 2.0 Async, and Pydantic validation.
+- [x] Paginated transactions table with page size switching (10, 25, 50, 100).
+- [x] Search, category filter, status filter, date range filter, and amount range filter.
+- [x] Multi-column sorting (Date & Amount).
+- [x] Transaction detail slide-over drawer.
+- [x] Interactive Recharts analytics (Category donut chart & Monthly trend bar chart).
+- [x] Chart-to-table category filter navigation.
+- [x] Rewards catalogue with atomic coin deduction and row locking (`SELECT ... FOR UPDATE`).
+- [x] Unified Express Node.js proxy server forwarding requests from port 3000 to port 8001.
+
+### Not Done
+- [ ] User authentication / multi-user login (currently hardcoded to `demo-user`).
+- [ ] Automated database migrations using Alembic (currently relies on `Base.metadata.create_all`).
+- [ ] Docker containerization config (`Dockerfile` / `docker-compose.yml`).
+
+### Known Issues
+- `pytest-asyncio` missing from `backend/requirements.txt`, causing `pytest` to fail out-of-the-box unless installed.
+- Default database in code is SQLite (`sqlite+aiosqlite:///./finora.db`) rather than PostgreSQL, though PostgreSQL is fully supported when `DATABASE_URL` is set to a PostgreSQL URI.
