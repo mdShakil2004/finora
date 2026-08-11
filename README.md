@@ -1,10 +1,6 @@
-<div align="center">
+]<div align="center">
 
-# 💰 Finora  
-
-# try below link
-![Live Link](https://finora-vhos.vercel.app)
-
+# 💰 Finora
 
 ### Financial Dashboard & Rewards Engine
 
@@ -17,6 +13,10 @@ A full-stack consumer finance platform for transaction analytics, spending insig
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Production-4169E1?logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Local_Dev-003B57?logo=sqlite&logoColor=white)
 ![License](https://img.shields.io/badge/status-assessment_project-lightgrey)
+
+[![Live Demo](https://img.shields.io/badge/Live_Demo-finora--vhos.vercel.app-000000?logo=vercel&logoColor=white)](https://finora-vhos.vercel.app)
+
+**🔗 Live App:** [https://finora-vhos.vercel.app](https://finora-vhos.vercel.app)
 
 </div>
 
@@ -517,7 +517,7 @@ npm run dev
 
 ## 13. Production Deployment
 
-> **Status: not yet deployed.** Currently runs in a local container / AI Studio preview environment. The topology below is the intended production setup.
+> **Status: live.** The frontend is deployed on Vercel: **[finora-vhos.vercel.app](https://finora-vhos.vercel.app)**. The topology below reflects the production setup.
 
 ```text
 ┌────────────────────┐        HTTPS / API        ┌────────────────────┐        ┌────────────────────┐
@@ -686,7 +686,7 @@ User Authentication → JWT/Session → Authenticated User ID → User-scoped Tr
 
 <div align="center">
 
-**Repository:** `https://github.com/mdShakil2004/finora`
+**Live App:** [finora-vhos.vercel.app](https://finora-vhos.vercel.app) · **Repository:** `https://github.com/mdShakil2004/finora`
 
 *Developed as part of a technical assessment — intended for evaluation and demonstration purposes.*
 
