@@ -1,4 +1,3 @@
-````markdown
 # Technical Decision Records
 
 This document records the major engineering and architectural decisions made during the development of Finora.
@@ -15,10 +14,10 @@ We needed a fast, maintainable, type-safe client framework capable of rendering 
 
 Chosen **React 19** with **TypeScript 5.8** bundled by **Vite 6.2**.
 
-### Alternatives considered
+### Alternatives Considered
 
-- **Next.js (App Router)**: Offers SSR/SSG capabilities.
-- **Plain HTML/Vanilla JS**: Lightest weight, but difficult to maintain for dynamic state-heavy tables and modals.
+- **Next.js (App Router)** — offers SSR/SSG capabilities.
+- **Plain HTML/Vanilla JS** — lightest weight, but difficult to maintain for dynamic state-heavy tables and modals.
 
 ### Why
 
@@ -40,16 +39,18 @@ A monolith component structure, such as placing all UI logic inside `App.tsx`, c
 
 Structured the UI into modular single-responsibility components under `src/components/`:
 
-- `Navbar.tsx`: Top navigation & live balance badge
-- `SummaryCards.tsx`: High-level metrics
-- `FilterBar.tsx`: Multi-field filter controls
-- `TransactionTable.tsx`: Paginated grid & sort headers
-- `TransactionDetailDrawer.tsx`: Slide-over detail view
-- `AnalyticsSection.tsx`: Recharts charts
-- `RewardsCatalogue.tsx`: Voucher marketplace & redemption modal
-- `ui/`: Primitive UI components (Button, Input, Select, Badge, Toast)
+| Component | Responsibility |
+|---|---|
+| `Navbar.tsx` | Top navigation & live balance badge |
+| `SummaryCards.tsx` | High-level metrics |
+| `FilterBar.tsx` | Multi-field filter controls |
+| `TransactionTable.tsx` | Paginated grid & sort headers |
+| `TransactionDetailDrawer.tsx` | Slide-over detail view |
+| `AnalyticsSection.tsx` | Recharts charts |
+| `RewardsCatalogue.tsx` | Voucher marketplace & redemption modal |
+| `ui/` | Primitive UI components (Button, Input, Select, Badge, Toast) |
 
-### Alternatives considered
+### Alternatives Considered
 
 - Single mega-component in `App.tsx`.
 - Highly atomic design folders (`atoms/`, `molecules/`, `organisms/`).
@@ -74,10 +75,10 @@ The application needs to share state between filters, tables, summary cards, and
 
 Used **React Hooks (`useState`, `useCallback`)** with central state orchestration inside `App.tsx`.
 
-### Alternatives considered
+### Alternatives Considered
 
-- **Redux Toolkit / Zustand**: Global state stores.
-- **React Context API**: Shared context providers.
+- **Redux Toolkit / Zustand** — global state stores.
+- **React Context API** — shared context providers.
 
 ### Why
 
@@ -99,10 +100,10 @@ The application needs to display paginated transaction records with status badge
 
 Built a custom, accessible Tailwind CSS table component (`TransactionTable.tsx`).
 
-### Alternatives considered
+### Alternatives Considered
 
-- **TanStack Table (React Table)**: Headless table library.
-- **AG Grid / DataGrid**: Feature-heavy enterprise grid.
+- **TanStack Table (React Table)** — headless table library.
+- **AG Grid / DataGrid** — feature-heavy enterprise grid.
 
 ### Why
 
@@ -124,9 +125,9 @@ The application needs to handle 8,461 transaction records efficiently without un
 
 Implemented **Server-Side SQL Pagination** using `LIMIT` and `OFFSET` clauses.
 
-### Alternatives considered
+### Alternatives Considered
 
-- **Client-side Virtualization (`react-window` / `react-virtualized`)**: Fetching all 8,461 items at once and rendering only visible rows.
+- **Client-side Virtualization (`react-window` / `react-virtualized`)** — fetching all 8,461 items at once and rendering only visible rows.
 
 ### Why
 
@@ -148,9 +149,9 @@ Users can search merchants and filter by category, status, date range, and amoun
 
 Implemented **Server-Side SQL Filtering** in FastAPI using SQLAlchemy dynamic query building.
 
-### Alternatives considered
+### Alternatives Considered
 
-- **Client-Side In-Memory Filtering**: Loading all dataset records into browser memory and applying `.filter()` in JavaScript.
+- **Client-Side In-Memory Filtering** — loading all dataset records into browser memory and applying `.filter()` in JavaScript.
 
 ### Why
 
@@ -180,7 +181,7 @@ As users type in the merchant search input, sending an API request on every keys
 
 Added **300ms client-side debouncing** using a `useEffect` timer inside `FilterBar.tsx`.
 
-### Alternatives considered
+### Alternatives Considered
 
 - Triggering search only after pressing "Enter" or clicking a "Search" button.
 - Sending un-debounced requests on every keyup event.
@@ -205,12 +206,12 @@ FastAPI route handlers can become difficult to maintain when database queries, b
 
 Implemented a strict four-layer architecture:
 
-1. **API Controllers (`backend/app/api/`)**: HTTP routing, query parameter parsing, and status codes.
-2. **Services (`backend/app/services/`)**: Business logic, reward calculations, and transaction orchestration.
-3. **Repositories (`backend/app/repositories/`)**: Database query execution through SQLAlchemy `AsyncSession`.
-4. **Models (`backend/app/models/`)**: Declarative SQLAlchemy ORM definitions.
+1. **API Controllers** (`backend/app/api/`) — HTTP routing, query parameter parsing, and status codes.
+2. **Services** (`backend/app/services/`) — Business logic, reward calculations, and transaction orchestration.
+3. **Repositories** (`backend/app/repositories/`) — Database query execution through SQLAlchemy `AsyncSession`.
+4. **Models** (`backend/app/models/`) — Declarative SQLAlchemy ORM definitions.
 
-### Alternatives considered
+### Alternatives Considered
 
 - Putting database queries directly inside FastAPI route functions ("fat routes").
 
@@ -241,7 +242,7 @@ Designed normalized relational tables:
 
 The application uses **SQLAlchemy 2.0 Async** with **PostgreSQL as the production database target**, while SQLite remains supported for zero-configuration local development.
 
-### Alternatives considered
+### Alternatives Considered
 
 - NoSQL document store such as MongoDB.
 - Non-relational key-value storage.
@@ -256,7 +257,7 @@ Requires explicit database configuration and schema/seed setup, but provides str
 
 ---
 
-## Decision: Asynchronous Database Access (`SQLAlchemy 2.0 Async`)
+## Decision: Asynchronous Database Access (SQLAlchemy 2.0 Async)
 
 ### Context
 
@@ -269,7 +270,7 @@ Used SQLAlchemy's **`AsyncSession`** with:
 - `asyncpg` for PostgreSQL.
 - `aiosqlite` for SQLite local development.
 
-### Alternatives considered
+### Alternatives Considered
 
 - Synchronous SQLAlchemy ORM running inside synchronous route handlers.
 
@@ -295,7 +296,7 @@ Concurrent redemption requests could otherwise introduce race conditions and pot
 
 Implemented **atomic row locking** using `SELECT ... FOR UPDATE` through `UserRepository.get_by_id_for_update`, wrapped inside a single SQLAlchemy asynchronous transaction.
 
-### Alternatives considered
+### Alternatives Considered
 
 - Optimistic locking using version fields.
 - Unlocked read-then-write updates.
@@ -320,24 +321,24 @@ API input parameters such as page numbers, page sizes, statuses, and response ob
 
 Used **Pydantic V2 schemas** under `backend/app/schemas/` with explicit field constraints.
 
-Examples include:
+Example:
 
 ```python
 Query(..., ge=1, le=100)
-````
+```
 
-### Alternatives considered
+### Alternatives Considered
 
-* Manual dictionary inspection and validation inside Python code.
+- Manual dictionary inspection and validation inside Python code.
 
 ### Why
 
 Pydantic integrates directly with FastAPI and provides:
 
-* Automatic request validation.
-* OpenAPI/Swagger documentation.
-* Structured response serialization.
-* Clear HTTP 422 validation errors.
+- Automatic request validation.
+- OpenAPI/Swagger documentation.
+- Structured response serialization.
+- Clear HTTP 422 validation errors.
 
 ### Trade-offs
 
@@ -357,9 +358,9 @@ Used FastAPI `HTTPException` for expected API errors and centralized exception h
 
 The frontend handles API errors and displays user-friendly Toast notifications.
 
-### Alternatives considered
+### Alternatives Considered
 
-* Returning `200 OK` with an `error` field in the response body.
+- Returning `200 OK` with an `error` field in the response body.
 
 ### Why
 
@@ -371,7 +372,7 @@ Frontend API wrappers need to explicitly handle non-success HTTP responses.
 
 ---
 
-## Decision: Charting Library Selection (`Recharts`)
+## Decision: Charting Library Selection (Recharts)
 
 ### Context
 
@@ -381,10 +382,10 @@ The application needs to visualize spending trends and category distributions.
 
 Chosen **Recharts 3.10**.
 
-### Alternatives considered
+### Alternatives Considered
 
-* **Chart.js (`react-chartjs-2`)**: Canvas-based charts.
-* **D3.js**: Low-level custom SVG manipulation.
+- **Chart.js (`react-chartjs-2`)** — canvas-based charts.
+- **D3.js** — low-level custom SVG manipulation.
 
 ### Why
 
@@ -406,14 +407,14 @@ During local development, the frontend and FastAPI backend run on separate ports
 
 Created a unified Node.js Express server (`server.ts`) for local development that:
 
-* Listens on port `3000`.
-* Starts the FastAPI process on port `8001`.
-* Proxies `/api/*` requests to FastAPI.
+- Listens on port `3000`.
+- Starts the FastAPI process on port `8001`.
+- Proxies `/api/*` requests to FastAPI.
 
-### Alternatives considered
+### Alternatives Considered
 
-* Running the frontend and backend separately in different terminals.
-* Configuring the frontend to communicate directly with the FastAPI development server.
+- Running the frontend and backend separately in different terminals.
+- Configuring the frontend to communicate directly with the FastAPI development server.
 
 ### Why
 
@@ -444,10 +445,10 @@ The reset sequence removes records from:
 
 The pipeline then inserts the cleaned **8,461 transaction records** and recreates the demo state.
 
-### Alternatives considered
+### Alternatives Considered
 
-* Append-only seeding with duplicate checks for every record.
-* Incremental upsert-based seeding.
+- Append-only seeding with duplicate checks for every record.
+- Incremental upsert-based seeding.
 
 ### Why
 
@@ -469,10 +470,10 @@ Database URLs, CORS origins, demo-user configuration, and application constants 
 
 Used **`pydantic-settings` `BaseSettings`** to load environment configuration from environment variables and `.env` during local development, with safe fallback defaults where appropriate.
 
-### Alternatives considered
+### Alternatives Considered
 
-* Hardcoding configuration strings directly in source code.
-* Using plain `os.getenv()` without typed configuration.
+- Hardcoding configuration strings directly in source code.
+- Using plain `os.getenv()` without typed configuration.
 
 ### Why
 
@@ -481,6 +482,3 @@ Used **`pydantic-settings` `BaseSettings`** to load environment configuration fr
 ### Trade-offs
 
 Requires `pydantic-settings` as a backend dependency and requires production environment variables to be configured correctly.
-
-```
-```
