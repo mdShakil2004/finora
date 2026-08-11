@@ -1,4 +1,4 @@
-````markdown
+
 # AI Usage & Verification Record
 
 This document records how AI-assisted development tools were used during the Finora project, how generated output was reviewed and refined, and how the resulting implementation was verified. AI was used as a development aid; final technical decisions, validation, testing, and integration were performed by the developer.
