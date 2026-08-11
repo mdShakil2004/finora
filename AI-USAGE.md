@@ -1,95 +1,99 @@
 # AI Usage & Verification Record
 
-This document details the usage of AI coding assistants, human review workflows, corrections made to AI outputs, and verification procedures for the Finora project, as required for the Digital Alpha Technologies take-home evaluation.
+This document describes how AI-assisted development tools were used during the implementation of the Finora project, how generated output was reviewed and modified, and how the resulting application was verified.
+
+The purpose of this document is to provide transparency into the development workflow while clearly distinguishing AI-assisted implementation from developer review, engineering decisions, and final verification.
 
 ---
 
-## Tools Used
+## 1. AI Tools Used
 
-- **Google AI Studio / Antigravity Agent** (powered by Gemini models, including `gemini-3.6-flash`)
-- **VS Code / AI Coding Environment**
+The following AI-assisted development tools were used during the project:
 
----
+- **Google AI Studio / Antigravity Agent** — used for code generation, debugging, implementation assistance, and technical review.
+- **VS Code / AI-assisted development environment** — used for code suggestions, refactoring, and development assistance.
 
-## Where AI Was Used
-
-AI assistance was utilized across the following areas of project development:
-
-1. **Initial Project Scaffolding**: Generating project structure for the React + Vite frontend and FastAPI backend.
-2. **Component Implementation**: Drafting initial React UI components for transaction tables (`TransactionTable.tsx`), analytics charts (`AnalyticsSection.tsx`), summary cards (`SummaryCards.tsx`), and filter controls (`FilterBar.tsx`).
-3. **Backend Route & Database Models**: Creating SQLAlchemy 2.0 ORM models (`Transaction`, `User`, `Reward`, `RewardRedemption`), Pydantic V2 request/response schemas, and FastAPI API routes (`transactions.py`, `rewards.py`, `analytics.py`, `health.py`).
-4. **Data Seed Pipeline**: Drafting the `backend/scripts/seed.py` dataset ingestion script to process `transactions.json`.
-5. **Documentation**: Drafting initial architecture summaries, API references, and Technical Decision Records.
+AI was used as a development aid rather than as an autonomous source of final engineering decisions.
 
 ---
 
-## Human Review & Refinement Workflow
+## 2. Areas Where AI Assistance Was Used
 
-All AI-generated code was actively reviewed, tested, and modified by the developer prior to integration. The human review process focused on:
-- Ensuring strict compliance with the Digital Alpha Technologies assessment specifications.
-- Validating database schema consistency, indexes, and relationship constraints.
-- Verifying business logic for reward coin calculations, atomic balance deductions, and pagination math.
-- Correcting syntax, type definitions, and environment configurations.
+AI assistance was used across several parts of the application.
 
----
+### 2.1 Project Scaffolding
 
-## Real Examples of AI Output Rejected or Corrected
+AI assistance was used to establish the initial project structure for:
 
-Below are two explicit, verified examples where initial AI-generated output was rejected or corrected to align with project requirements:
+- React + TypeScript frontend
+- FastAPI backend
+- SQLAlchemy database layer
+- API route organization
+- Shared schemas and models
+- Development and deployment configuration
 
-### Example 1: Database Dialect & Configuration Correction
-
-- **What AI Generated**:
-  The AI assistant initially configured `backend/app/core/config.py` with a hardcoded SQLite connection string (`sqlite+aiosqlite:///./finora.db`) as the sole database target, without adding PostgreSQL driver dependencies or documenting how to target PostgreSQL.
-- **Why It Was Incorrect**:
-  The assessment brief specifically specifies PostgreSQL as the target database architecture:
-  $$\text{transactions.json} \longrightarrow \text{seed.py} \longrightarrow \text{PostgreSQL} \longrightarrow \text{FastAPI} \longrightarrow \text{Frontend}$$
-- **What Was Corrected**:
-  The developer added `asyncpg>=0.28.0` to `backend/requirements.txt`, updated `backend/app/core/config.py` to support dynamic environment variable overrides (`DATABASE_URL`), updated `backend/app/core/database.py` with connection pooling settings suitable for PostgreSQL (`pool_size=10, max_overflow=20, pool_pre_ping=True`), and explicitly documented how to switch to PostgreSQL in `README.md`.
+The generated structure was subsequently reviewed and adapted to the requirements of the assessment.
 
 ---
 
-### Example 2: Reward Coin Calculation Formula Correction
+### 2.2 Frontend Development
 
-- **What AI Generated**:
-  In early iterations of `backend/scripts/seed.py`, the AI generated a reward coin calculation logic using a ratio of **1 coin for every ₹10 spent**:
-  ```python
-  # AI Generated (INCORRECT):
-  reward_coins = min(500, int(amount // 10))
-  ```
-- **Why It Was Incorrect**:
-  The assessment specification explicitly defines the reward calculation rule as:
-  > *"one coin per ₹100 spent, capped per transaction."*
-  
-  Using ₹10 instead of ₹100 inflated user coin earnings by 10x (resulting in over 6.1 million coins instead of ~617k coins).
-- **What Was Corrected**:
-  The developer identified the discrepancy during code review, rejected the AI-generated ratio, and updated `backend/scripts/seed.py` to use the correct divisor of 100:
-  ```python
-  # Developer Corrected (CORRECT):
-  if status == "SUCCESS" and amount > 0:
-      coins = min(math.floor(float(amount) / 100.0), settings.MAX_REWARD_COINS_PER_TRANSACTION)
-  ```
-  This produced the verified, accurate coin total of **617,858 coins** across the 8,461 transaction dataset.
+AI assistance was used to draft and refine several frontend components, including:
+
+- `TransactionTable.tsx`
+- `AnalyticsSection.tsx`
+- `SummaryCards.tsx`
+- `FilterBar.tsx`
+- `TransactionDetailDrawer.tsx`
+- `RewardsCatalogue.tsx`
+- Reusable UI components such as buttons, cards, badges, inputs, modals, drawers, skeletons, and toast notifications.
+
+AI assistance was also used for:
+
+- TypeScript type definitions
+- API integration
+- Formatting utilities
+- Responsive UI implementation
+- Loading and empty states
+- Component refactoring
+- Frontend build/debugging
+
+The final implementation was reviewed against the functional requirements and the expected user workflow.
 
 ---
 
-## Verification & Testing Methodology
+### 2.3 Backend Development
 
-To ensure system reliability, the following verification checks were performed:
+AI assistance was used during implementation of:
 
-1. **Dataset Integrity Verification**:
-   - Ran `python3 -c "import json; print(len(json.load(open('transactions.json'))))"` to verify exact record count (**8,461** records).
-   - Executed `PYTHONPATH=. python3 backend/scripts/seed.py` and confirmed 8,461 rows successfully inserted into the database without missing fields or unhandled timestamp errors.
+- FastAPI application structure
+- REST API routes
+- SQLAlchemy ORM models
+- Pydantic request and response schemas
+- Repository layer
+- Service layer
+- Database configuration
+- Transaction filtering and pagination
+- Analytics calculations
+- Reward catalogue and redemption logic
+- Health-check endpoint
+- Error handling and logging
 
-2. **Backend API Testing**:
-   - Tested `/api/health`, `/api/transactions`, `/api/rewards/balance`, `/api/rewards`, `/api/rewards/redeem`, `/api/analytics/categories`, and `/api/analytics/monthly` endpoints via HTTP requests.
-   - Verified HTTP 409 Conflict response when attempting to redeem vouchers with insufficient coin balance.
-   - Verified HTTP 404 response when querying non-existent transaction IDs.
+The backend was organized into separate API, service, repository, model, schema, and configuration layers to keep responsibilities separated.
 
-3. **Frontend Build & Type Checks**:
-   - Ran `npm run lint` (`tsc --noEmit`) to verify zero TypeScript compiler errors.
-   - Ran `npm run build` to verify Vite bundle compilation.
+---
 
-4. **Pytest Execution**:
-   - Executed `PYTHONPATH=. pytest backend/tests`.
-   - Identified and documented that `pytest-asyncio` is missing from default `backend/requirements.txt`, causing pytest to fail out-of-the-box until `pytest-asyncio` is installed (noted in `README.md`).
+### 2.4 Data Ingestion and Seed Pipeline
+
+AI assistance was used to develop the dataset ingestion workflow:
+
+```text
+transactions.json
+       ↓
+seed.py
+       ↓
+PostgreSQL
+       ↓
+FastAPI
+       ↓
+Frontend
