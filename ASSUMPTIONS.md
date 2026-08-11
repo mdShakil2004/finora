@@ -1,3 +1,4 @@
+````markdown
 # Product & Technical Assumptions
 
 This document outlines the product and technical assumptions made during the implementation of Finora.
@@ -7,16 +8,29 @@ This document outlines the product and technical assumptions made during the imp
 ## Assumption: Reward Coin Calculation Rule
 
 ### Context
+
 The assessment prompt states: *"one coin per ₹100 spent, capped per transaction."* The exact numerical cap was intentionally left unspecified.
 
 ### Decision
+
 We implemented a reward calculation rule of **1 Finora Coin for every ₹100 spent**, capped at a maximum of **500 coins per transaction**.
-$$\text{reward\_coins} = \min\left(500, \left\lfloor \frac{\text{amount}}{100} \right\rfloor\right)$$
+
+$$
+\text{reward\_coins} =
+\min\left(
+500,
+\left\lfloor
+\frac{\text{amount}}{100}
+\right\rfloor
+\right)
+$$
 
 ### Reason
-Setting a cap of 500 coins per transaction prevents extreme outlier transactions (e.g., high-value corporate transfers or large equipment purchases) from skewing user coin balances while maintaining strong incentive engagement for standard consumer transactions.
+
+Setting a cap of 500 coins per transaction prevents extreme outlier transactions from disproportionately skewing user coin balances while maintaining a meaningful reward incentive for normal consumer spending.
 
 ### Impact
+
 Across the 8,461 transaction dataset, this rule yields an initial balance of **617,858 coins** for the default demo user account.
 
 ---
@@ -24,146 +38,242 @@ Across the 8,461 transaction dataset, this rule yields an initial balance of **6
 ## Assumption: Reward Eligibility & Transaction Status
 
 ### Context
-The dataset contains transactions with varying statuses (`SUCCESS`, `FAILED`, `PENDING`, `REFUNDED`). The brief did not specify whether failed or pending payments earn reward coins.
+
+The dataset contains transactions with varying statuses such as `SUCCESS`, `FAILED`, `PENDING`, and `REFUNDED`. The brief did not explicitly specify whether unsuccessful transactions should earn reward coins.
 
 ### Decision
-Only transactions with `status == "SUCCESS"` and a strictly positive amount (`amount > 0`) earn reward coins. Transactions marked as `FAILED`, `PENDING`, or `REFUNDED` earn **0 coins**.
+
+Only transactions satisfying both conditions earn reward coins:
+
+- `status == "SUCCESS"`
+- `amount > 0`
+
+Transactions marked as `FAILED`, `PENDING`, or `REFUNDED` earn **0 coins**.
 
 ### Reason
-Financially sound loyalty programs must only award benefits for completed, cleared payments. Awarding coins on failed or pending transactions would create financial exposure and abuse vectors.
+
+Rewards should only be issued for completed and successful payments. Awarding coins for failed or pending transactions could create incorrect balances and introduce opportunities for abuse.
 
 ### Impact
-Failed and pending transactions are tracked and visible in the transactions ledger for audit purposes, but contribute `0` to the user's reward coin total.
+
+Unsuccessful transactions remain available in the transaction ledger for visibility and auditability but contribute zero coins to the reward balance.
 
 ---
 
 ## Assumption: Handling of Negative & Zero Transaction Amounts
 
 ### Context
-The dataset includes edge-case records with negative or zero monetary amounts.
+
+The dataset contains edge-case records with negative or zero monetary amounts.
 
 ### Decision
-Negative amounts (e.g. refunds or credit adjustments) and zero-amount entries are normalized and inserted into the database for ledger completeness, but are excluded from coin calculation (`amount > 0` check).
+
+Negative and zero-value transactions are retained in the database for ledger completeness but are excluded from reward calculation.
+
+```text
+amount <= 0 → 0 reward coins
+````
 
 ### Reason
-Negative amounts represent reversals or internal entries. Deducting coins retrospectively during initial dataset ingestion without individual line-item matching against previous positive transactions could produce invalid negative coin balances.
+
+Negative amounts may represent refunds, reversals, or credit adjustments. Deducting rewards during initial ingestion without explicitly matching each reversal to its original transaction could produce incorrect reward balances.
 
 ### Impact
-Transactions with `amount <= 0` earn 0 coins during ingestion.
+
+All transactions remain available for reporting and analytics, while only positive successful transactions contribute to the initial reward balance.
 
 ---
 
 ## Assumption: Currency Standardization
 
 ### Context
-Transactions in the dataset specify currency fields, mostly defaulting to Indian Rupees (`INR`).
+
+The dataset contains currency fields, with the application primarily operating on Indian Rupees.
 
 ### Decision
-The application assumes **INR (`₹`)** as the uniform operating currency across the user interface, summary metrics, and voucher catalogue.
+
+The application uses **INR (`₹`)** as the standard operating currency for the user interface, summary metrics, analytics, and rewards catalogue.
 
 ### Reason
-Standardizing on INR ensures consistent UI formatting, unambiguous reward coin conversions (1 coin per ₹100), and straightforward voucher pricing (e.g., ₹100 Amazon Voucher = 1,000 Coins).
+
+Using a single operating currency provides consistent monetary formatting and makes the reward conversion rule deterministic:
+
+```text
+1 Finora Coin per ₹100 spent
+```
+
+It also keeps voucher pricing consistent with the INR-based consumer experience.
 
 ### Impact
-All monetary values across tables, summary cards, and charts are formatted using `INR` locale rules (`₹`).
+
+Monetary values displayed throughout the application use INR formatting and the `₹` symbol.
 
 ---
 
 ## Assumption: Heterogeneous Timestamp Normalization
 
 ### Context
-The `transactions.json` dataset contains raw timestamps in multiple inconsistent formats: Unix timestamps in milliseconds (e.g., `1773586930000`), Unix timestamps in seconds, slash-formatted strings (`YYYY/MM/DD HH:MM:SS`), date-only strings (`YYYY-MM-DD`), and ISO 8601 strings.
+
+The `transactions.json` dataset contains timestamps in multiple formats, including:
+
+* Unix timestamps in milliseconds
+* Unix timestamps in seconds
+* `YYYY/MM/DD HH:MM:SS`
+* `YYYY-MM-DD`
+* ISO 8601 timestamps
 
 ### Decision
-The ingestion script (`seed.py`) implements a resilient multi-format parser (`parse_timestamp`) that detects the input format, normalizes dates into standard Python `datetime` objects, and explicitly attaches UTC timezone information (`timezone.utc`).
+
+The ingestion pipeline in `backend/scripts/seed.py` uses a multi-format timestamp parser that detects the input representation and normalizes it into Python `datetime` objects with UTC timezone information.
 
 ### Reason
-Inconsistent timestamps prevent accurate SQL range filtering, monthly trend grouping, and sorting. Standardizing during seed ingestion guarantees date integrity across PostgreSQL/SQLite.
+
+Consistent timestamps are required for reliable:
+
+* Sorting
+* Date-range filtering
+* Monthly analytics
+* PostgreSQL date/time operations
 
 ### Impact
-All 8,461 records in the database feature valid UTC ISO timestamps, enabling precise monthly analytics aggregations.
+
+Transaction timestamps are normalized during ingestion and stored consistently, allowing the backend to perform reliable temporal queries and aggregations.
 
 ---
 
-## Assumption: Server-Side Pagination vs. Client-Side Virtualization
+## Assumption: Server-Side Pagination
 
 ### Context
-The dataset contains 8,461 transactions, which is too large for unpaginated client-side DOM rendering but small enough to fit in memory on modern servers.
+
+The dataset contains 8,461 transactions. Rendering the complete dataset in the browser is unnecessary and does not represent a scalable transaction-ledger architecture.
 
 ### Decision
-We chose **Server-Side Pagination** with SQL `LIMIT` and `OFFSET` clauses, supporting page sizes of 10, 25, 50, and 100 records per page.
+
+The application uses **server-side pagination** with SQL `LIMIT` and `OFFSET`.
+
+Supported page sizes are:
+
+```text
+10
+25
+50
+100
+```
 
 ### Reason
-Server-side pagination simulates realistic production architecture where transaction volumes scale into millions of rows. It minimizes network transfer payloads (~5KB per page vs ~1.5MB for the full dataset) and ensures fast initial page loads.
+
+Server-side pagination reduces the amount of data transferred to the client and allows the same API architecture to scale to substantially larger transaction datasets.
+
+It also keeps filtering, sorting, and pagination close to the database where these operations can be efficiently executed.
 
 ### Impact
-The client receives only the current page of items along with total count metadata, maintaining instant UI rendering responsiveness.
+
+The frontend receives only the requested page together with pagination metadata rather than loading all transactions into the browser.
 
 ---
 
 ## Assumption: Default Sort Order
 
 ### Context
-The UI needs an initial sort order when users open the transactions table.
+
+The transaction table requires a deterministic initial ordering.
 
 ### Decision
-Transactions are sorted by **Date (`timestamp`) descending (`desc`)** by default.
+
+Transactions are sorted by **timestamp descending** by default.
 
 ### Reason
-Financial dashboards prioritize showing recent activity first. Users expect to see their latest transactions at the top of the table.
+
+A financial transaction dashboard generally prioritizes the most recent activity so users can immediately see their latest transactions.
 
 ### Impact
-The table displays the newest records first upon initial render, with controls to switch to ascending order or sort by transaction amount.
+
+The newest transactions appear first when the transaction ledger is opened. Users can change the sort direction and supported sorting fields through the table controls.
 
 ---
 
 ## Assumption: Pre-populated Rewards Catalogue
 
 ### Context
-The assessment requires a rewards catalogue and redemption flow, but did not specify exact catalog inventory items or pricing.
+
+The assessment requires a rewards catalogue and redemption flow but does not prescribe specific catalogue items or prices.
 
 ### Decision
-We created a seeded catalogue of 5 brand vouchers:
-1. **Amazon ₹100 Voucher**: 1,000 Coins
-2. **Swiggy ₹100 Voucher**: 1,000 Coins
-3. **Flipkart ₹250 Voucher**: 2,200 Coins
-4. **Cashback ₹500**: 4,500 Coins
-5. **Travel Voucher ₹1000**: 8,500 Coins
+
+The application uses the following seeded rewards:
+
+| Reward                |        Cost |
+| --------------------- | ----------: |
+| Amazon ₹100 Voucher   | 1,000 Coins |
+| Swiggy ₹100 Voucher   | 1,000 Coins |
+| Flipkart ₹250 Voucher | 2,200 Coins |
+| Cashback ₹500         | 4,500 Coins |
+| Travel Voucher ₹1000  | 8,500 Coins |
 
 ### Reason
-Preset pricing establishes a clear 10:1 coin-to-rupee redemptive value ratio, giving users tangible goals to test the redemption workflow.
+
+A predefined catalogue makes the redemption workflow immediately testable and provides different redemption values for reviewers to evaluate.
 
 ### Impact
-Users can test successful redemptions, observe coin balance deductions, and verify error states when attempting to redeem with insufficient balance.
+
+Reviewers can test:
+
+* Available rewards
+* Insufficient balance states
+* Successful redemption
+* Coin balance deduction
+* Redemption API behavior
 
 ---
 
 ## Assumption: Demo User Identity Model
 
 ### Context
-User authentication, authorization, and multi-tenant user registration were out of scope for the assessment.
+
+Authentication, authorization, and multi-user registration are outside the scope of the assessment.
 
 ### Decision
-The backend operates against a static single demo user account (`demo-user`). All balance checks, transactions summary counts, and voucher redemptions read and mutate `demo-user`.
+
+The backend operates using a static demo user:
+
+```text
+demo-user
+```
+
+The demo user is used for:
+
+* Reward balance retrieval
+* Reward redemption
+* Demo account state
+* Transaction-related dashboard operations
 
 ### Reason
-Using a fixed demo user removes authentication friction for reviewers while maintaining realistic database state management and row locking (`SELECT ... FOR UPDATE`).
+
+A fixed demo identity removes authentication overhead and allows reviewers to immediately evaluate the core application functionality.
 
 ### Impact
-Reviewers can immediately interact with the application and redeem rewards without creating an account or logging in.
+
+Reviewers can interact with the complete transaction, analytics, and rewards workflows without creating an account or logging in.
 
 ---
 
 ## Assumption: Timezone Display Handling
 
 ### Context
-Database timestamps are stored in UTC, but users operate in local timezones.
+
+Transaction timestamps need consistent storage while remaining readable to users in different locations.
 
 ### Decision
-The backend stores all timestamps as UTC ISO-8601 strings (`TIMESTAMPTZ`), and the frontend converts them to the user's local timezone using standard browser locale formatters (`toLocaleString()`).
+
+The backend stores timestamps in UTC. The frontend converts timestamps to the user's local timezone using the browser's locale/timezone handling.
 
 ### Reason
-Storing UTC in the database prevents timezone ambiguity in analytical aggregations, while client-side conversion provides an intuitive experience for end users.
+
+UTC provides a consistent representation for storage, sorting, filtering, and analytics, while client-side conversion provides a more intuitive display for the end user.
 
 ### Impact
-Transaction timestamps render cleanly in local time across client browsers.
+
+The database maintains timezone-consistent transaction data while users see transaction timestamps formatted according to their local browser timezone.
+
+```
+```
