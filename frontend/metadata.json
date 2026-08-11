@@ -1,0 +1,6 @@
+{
+  "name": "Finora",
+  "description": "Consumer finance platform for managing transactions, spending analytics, and coin rewards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
